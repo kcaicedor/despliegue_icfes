@@ -523,59 +523,104 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 
 
-def configure_experiment(name_experiment, modelos, option):
-    # defina el servidor para llevar el registro de modelos y artefactos
-    mlflow.set_tracking_uri("http://0.0.0.0:5000")
 
-    # registre el experimento
+def configure_experiment(name_experiment, modelos, option):
+
+    # Registrar experimento
     experiment = mlflow.set_experiment(name_experiment)
 
-    if option == 1:
+    # Seleccionar modelo
+    if option == 0:
+        rf = modelos["Baseline"]
+        nombre_modelo = "baseline-model"
+        X_train_model = X_train_base
+        y_train_model = y_train_base
+        X_test_model = X_test_base
+        y_test_model = y_test_base
+
+    elif option == 1:
         rf = modelos["Regresion_Lineal"]
-        nombre_modelo = 'regresion-lineal-model'
+        nombre_modelo = "regresion-lineal-model"
+        X_train_model = X_train
+        y_train_model = y_train
+        X_test_model = X_test
+        y_test_model = y_test
 
     elif option == 2:
         rf = modelos["Random_Forest"]
-        nombre_modelo = 'random-forest-model'
+        nombre_modelo = "random-forest-model"
+        X_train_model = X_train
+        y_train_model = y_train
+        X_test_model = X_test
+        y_test_model = y_test
 
     elif option == 3:
         rf = modelos["Gradient_Boosting"]
-        nombre_modelo = 'gradient-boosting-model'
+        nombre_modelo = "gradient-boosting-model"
+        X_train_model = X_train
+        y_train_model = y_train
+        X_test_model = X_test
+        y_test_model = y_test
 
     else:
         raise ValueError("Opcion No Válida")
 
-    # Aquí se ejecuta MLflow sin especificar un nombre o id del experimento. MLflow los crea un experimento para este cuaderno por defecto y guarda las características del experimento y las métricas definidas.
-    # Para ver el resultado de las corridas haga click en Experimentos en el menú izquierdo.
-    with mlflow.start_run(experiment_id=experiment.experiment_id):
-        # mlflow.set_tag("modelo", nombre_modelo)
+    with mlflow.start_run(
+        experiment_id=experiment.experiment_id,
+        run_name=nombre_modelo
+    ):
 
-        mlflow.log_params(rf.get_params())
+        mlflow.set_tag("modelo", nombre_modelo)
 
-        # Cree el modelo con los parámetros definidos y entrénelo
-        rf.fit(X_train, y_train)
-        # Realice predicciones de prueba
-        predictions = rf.predict(X_test)
+        # Registrar parámetros
+        if hasattr(rf, "get_params"):
+            mlflow.log_params(rf.get_params())
 
-        # Registre el modelo
-        mlflow.sklearn.log_model(rf, 'modelo')
+        # Entrenar modelo
+        rf.fit(X_train_model, y_train_model)
 
-        # Cree y registre la métrica de interés
-        mse = mean_squared_error(y_test, predictions)
-        mlflow.log_metric("mse", mse)
-        print(f"modelo: {nombre_modelo}")
-        print(f"MSE: {mse}")
+        # Predicciones
+        predictions = rf.predict(X_test_model)
+
+        # Calcular métricas
+        mse = mean_squared_error(y_test_model, predictions)
+        mae = mean_absolute_error(y_test_model, predictions)
+        rmse = np.sqrt(mse)
+        r2 = r2_score(y_test_model, predictions)
+
+        # Registrar métricas
+        mlflow.log_metrics({
+            "MSE": mse,
+            "MAE": mae,
+            "RMSE": rmse,
+            "R2": r2
+        })
+
+        # Registrar modelo
+        #mlflow.sklearn.log_model(rf, "modelo")
+        mlflow.sklearn.log_model(
+            sk_model=rf,
+            artifact_path="modelo",
+            serialization_format="pickle"
+        )
+
+        print(f"Modelo: {nombre_modelo}")
+        print(f"MSE: {mse:.4f}")
+        print(f"MAE: {mae:.4f}")
+        print(f"RMSE: {rmse:.4f}")
+        print(f"R2: {r2:.4f}")
 
 modelos = {
-    "Regresion_Lineal": LinearRegression(),
-
+    "Baseline": modelo_base,
+    "Regresion_Lineal": LinearRegression(
+        
+    ),
     "Random_Forest": RandomForestRegressor(
-        n_estimators=100,
+        n_estimators=200,
         max_depth=6,
         max_features=4,
         random_state=42
     ),
-
     "Gradient_Boosting": GradientBoostingRegressor(
         n_estimators=200,
         max_depth=3,
@@ -584,20 +629,5 @@ modelos = {
     )
 }
 
-configure_experiment(
-    "Regresion_Lineal",
-    modelos,
-    option=1
-)
-
-configure_experiment(
-    "Random_Forest",
-    modelos,
-    option=2
-)
-
-configure_experiment(
-    "Gradient_Boosting",
-    modelos,
-    option=3
-)
+#ejecutar el baseline
+configure_experiment("Proyecto_ICFES", modelos, 0)
