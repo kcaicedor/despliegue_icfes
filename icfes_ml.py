@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.base import clone
+
 
 from scipy.stats import (
     pearsonr,
@@ -12,10 +14,10 @@ from scipy.stats import (
 
 from sklearn.feature_selection import mutual_info_regression
 
-pd.set_option('display.max_columns', None)
+#pd.set_option('print.max_columns', None)
 
 df = pd.read_csv("Saber11_2022.csv")
-df.head(5)
+#df.head(5)
 
 columnas_borrar1 = [
     "periodo","estu_tipodocumento","estu_consecutivo","cole_codigo_icfes",
@@ -37,14 +39,14 @@ print(df.shape)
 df.columns.tolist()
 
 # Porcentaje de valores faltantes
-display(
+print(
     (df.isnull().mean() * 100)
     .sort_values(ascending=False)
     .round(2)
 )
 
 # Distribución del puntaje global
-display(df["punt_global"].describe())
+print(df["punt_global"].describe())
 
 # Identificar registros con puntaje cero
 print("Puntajes iguales a cero:",
@@ -57,7 +59,7 @@ print("Fechas inválidas:",
 # Revisar posibles edades extremas posteriormente
 print(df["estu_fechanacimiento"].describe())
 
-display(
+print(
     df[df["punt_global"] == 0].T
 )
 
@@ -80,7 +82,7 @@ cardinalidad = cardinalidad.sort_values(
     by="Cardinalidad", ascending=False
 )
 
-display(cardinalidad)
+print(cardinalidad)
 
 col = "cole_nombre_establecimiento"
 
@@ -188,12 +190,12 @@ missing_analysis = missing_analysis[
     ascending=False
 )
 
-display(missing_analysis)
+print(missing_analysis)
 
 
 if numeric_cols:
 
-    display(
+    print(
         X_train[numeric_cols].describe().T
     )
 
@@ -232,7 +234,7 @@ correlation_comparison = pd.DataFrame({
     "spearman": target_spearman
 })
 
-display(
+print(
     correlation_comparison.sort_values(
         "spearman",
         key=abs,
@@ -276,7 +278,7 @@ anova_df = anova_df.sort_values(
     ascending=False
 )
 
-display(anova_df)
+print(anova_df)
 
 X_mi = X_train[categorical_cols].copy()
 
@@ -316,7 +318,7 @@ mi_results = mi_results.sort_values(
     ascending=False
 )
 
-display(mi_results)
+print(mi_results)
 
 association_summary = mi_results.merge(
     anova_df[["variable", "f_statistic", "p_value"]],
@@ -324,7 +326,7 @@ association_summary = mi_results.merge(
     how="left"
 )
 
-display(
+print(
     association_summary.sort_values(
         "mutual_information",
         ascending=False
@@ -411,7 +413,7 @@ X_test_fe[list(ordenes.keys())] = ordinal_encoder.transform(
     X_test_fe[list(ordenes.keys())]
 )
 
-display(X_train_fe[list(ordenes.keys())].head())
+print(X_train_fe[list(ordenes.keys())].head())
 
 print(X_train_fe[list(ordenes.keys())].dtypes)
 
@@ -435,7 +437,7 @@ cardinalidad = pd.DataFrame({
     ]
 })
 
-display(cardinalidad.sort_values("categorias", ascending=False))
+print(cardinalidad.sort_values("categorias", ascending=False))
 
 correspondencia = (
     X_train.groupby("cole_nombre_establecimiento")[
@@ -473,11 +475,29 @@ municipios_diferentes = X_train[
     X_train["estu_mcpio_presentacion"]
 ]
 
-print("Registros diferentes:", len(municipios_diferentes))
+#print("Registros diferentes:", len(municipios_diferentes))
 
-colegios_multisede = sedes_por_colegio[sedes_por_colegio > 1]
+#colegios_multisede = sedes_por_colegio[sedes_por_colegio > 1]
 
-print("Establecimientos con varias sedes:", len(colegios_multisede))
+#print("Establecimientos con varias sedes:", len(colegios_multisede))
+
+# Copia del dataset transformado
+X_train_fe2 = X_train_fe.copy()
+
+# Variables redundantes
+variables_eliminar = [
+    "cole_nombre_sede",
+    "estu_mcpio_presentacion",
+    "estu_depto_presentacion"
+]
+
+# Eliminar variables
+X_train_fe2 = X_train_fe2.drop(
+    columns=variables_eliminar
+)
+
+print("Dimensiones originales:", X_train.shape)
+print("Dimensiones después:", X_train_fe2.shape)
 
 # Copia del dataset transformado
 X_train_fe2 = X_train_fe.copy()
@@ -497,23 +517,93 @@ X_train_fe2 = X_train_fe2.drop(
 print("Dimensiones originales:", X_train.shape)
 print("Dimensiones después:", X_train_fe2.shape)
 
-# Copia del dataset transformado
-X_train_fe2 = X_train_fe.copy()
+# usamos train y test original 
+X_train_base = X_train.copy()
+X_test_base = X_test.copy()
 
-# Variables redundantes
-variables_eliminar = [
-    "cole_nombre_sede",
-    "estu_mcpio_presentacion",
-    "estu_depto_presentacion"
-]
+y_train_base = y_train.copy()
+y_test_base = y_test.copy()
 
-# Eliminar variables
-X_train_fe2 = X_train_fe2.drop(
-    columns=variables_eliminar
+numericas = X_train_base.select_dtypes(
+    include=["number"]
+).columns.tolist()
+
+categoricas = X_train_base.select_dtypes(
+    include=["object", "category", "string", "bool"]
+).columns.tolist()
+
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+# Pipeline numérico
+pipeline_numerico = Pipeline([
+    ("imputacion", SimpleImputer(strategy="median")),
+    ("escalado", StandardScaler())
+])
+
+# Pipeline categórico
+pipeline_categorico = Pipeline([
+    ("imputacion", SimpleImputer(
+        strategy="constant",
+        fill_value="Desconocido"
+    )),
+    ("encoding", OneHotEncoder(
+        handle_unknown="ignore"
+    ))
+])
+
+# Transformador general
+preprocessor_base = ColumnTransformer([
+    ("numericas", pipeline_numerico, numericas),
+    ("categoricas", pipeline_categorico, categoricas)
+])
+
+from sklearn.linear_model import LinearRegression
+
+modelo_base = Pipeline([
+    ("preprocesamiento", preprocessor_base),
+    ("regresion", LinearRegression())
+])
+
+modelo_base.fit(X_train_base, y_train_base)
+
+y_pred_base = modelo_base.predict(X_test_base)
+
+
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
 )
 
-print("Dimensiones originales:", X_train.shape)
-print("Dimensiones después:", X_train_fe2.shape)
+mae_base = mean_absolute_error(y_test_base, y_pred_base)
+
+rmse_base = np.sqrt(
+    mean_squared_error(y_test_base, y_pred_base)
+)
+
+r2_base = r2_score(y_test_base, y_pred_base)
+
+print("RESULTADOS MODELO BASELINE")
+print("---------------------------")
+print(f"MAE:  {mae_base:.4f}")
+print(f"RMSE: {rmse_base:.4f}")
+print(f"R²:   {r2_base:.4f}")
+
+# guardar 
+resultados_modelos = pd.DataFrame([
+    {
+        "Modelo": "Regresion Lineal Baseline",
+        "MAE": mae_base,
+        "RMSE": rmse_base,
+        "R2": r2_base
+    }
+])
+
+print(resultados_modelos)
+
 
 #Importe MLFlow para registrar los experimentos, el regresor de bosques aleatorios y la métrica de error cuadrático medio
 import mlflow
@@ -522,60 +612,100 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 
+#mlflow.set_tracking_uri("http://127.0.0.1:8050")
+
+from sklearn.base import clone
+from sklearn.pipeline import Pipeline
 
 def configure_experiment(name_experiment, modelos, option):
-    # defina el servidor para llevar el registro de modelos y artefactos
-    mlflow.set_tracking_uri("http://0.0.0.0:5000")
-
-    # registre el experimento
     experiment = mlflow.set_experiment(name_experiment)
 
-    if option == 1:
+    if option == 0:
+        rf = modelos["Baseline"]
+        nombre_modelo = "baseline-model"
+        X_train_model, y_train_model = X_train_base, y_train_base
+        X_test_model, y_test_model = X_test_base, y_test_base
+
+    elif option == 1:
         rf = modelos["Regresion_Lineal"]
-        nombre_modelo = 'regresion-lineal-model'
+        nombre_modelo = "regresion-lineal-model"
+        X_train_model, y_train_model = X_train, y_train
+        X_test_model, y_test_model = X_test, y_test
 
     elif option == 2:
         rf = modelos["Random_Forest"]
-        nombre_modelo = 'random-forest-model'
+        nombre_modelo = "random-forest-model"
+        X_train_model, y_train_model = X_train, y_train
+        X_test_model, y_test_model = X_test, y_test
 
     elif option == 3:
         rf = modelos["Gradient_Boosting"]
-        nombre_modelo = 'gradient-boosting-model'
+        nombre_modelo = "gradient-boosting-model"
+        X_train_model, y_train_model = X_train, y_train
+        X_test_model, y_test_model = X_test, y_test
 
     else:
-        raise ValueError("Opcion No Válida")
+        raise ValueError("Opción no válida")
 
-    # Aquí se ejecuta MLflow sin especificar un nombre o id del experimento. MLflow los crea un experimento para este cuaderno por defecto y guarda las características del experimento y las métricas definidas.
-    # Para ver el resultado de las corridas haga click en Experimentos en el menú izquierdo.
-    with mlflow.start_run(experiment_id=experiment.experiment_id):
-        # mlflow.set_tag("modelo", nombre_modelo)
+    # El baseline ya contiene su propio preprocesamiento.
+    # Los demás modelos necesitan que se lo agreguemos.
+    if option != 0:
+        rf = Pipeline([
+            ("preprocesamiento", clone(preprocessor_base)),
+            ("modelo", rf)
+        ])
 
-        mlflow.log_params(rf.get_params())
+    with mlflow.start_run(
+        experiment_id=experiment.experiment_id,
+        run_name=nombre_modelo
+    ):
+        mlflow.set_tag("modelo", nombre_modelo)
 
-        # Cree el modelo con los parámetros definidos y entrénelo
-        rf.fit(X_train, y_train)
-        # Realice predicciones de prueba
-        predictions = rf.predict(X_test)
+        rf.fit(X_train_model, y_train_model)
+        predictions = rf.predict(X_test_model)
 
-        # Registre el modelo
-        mlflow.sklearn.log_model(rf, 'modelo')
+        mse = mean_squared_error(y_test_model, predictions)
+        mae = mean_absolute_error(y_test_model, predictions)
+        rmse = np.sqrt(mse)
+        r2 = r2_score(y_test_model, predictions)
 
-        # Cree y registre la métrica de interés
-        mse = mean_squared_error(y_test, predictions)
-        mlflow.log_metric("mse", mse)
-        print(f"modelo: {nombre_modelo}")
-        print(f"MSE: {mse}")
+        mlflow.log_metrics({
+            "MSE": mse,
+            "MAE": mae,
+            "RMSE": rmse,
+            "R2": r2
+        })
+
+        # Registra los parámetros del estimador, no los del preprocesador.
+        if option != 0:
+            params = rf.named_steps["modelo"].get_params()
+            mlflow.log_params({
+                f"modelo_{key}": str(value)
+                for key, value in params.items()
+            })
+
+        mlflow.sklearn.log_model(
+            sk_model=rf,
+            artifact_path="modelo"
+        )
+
+        print(f"Modelo: {nombre_modelo}")
+        print(f"MSE: {mse:.4f}")
+        print(f"MAE: {mae:.4f}")
+        print(f"RMSE: {rmse:.4f}")
+        print(f"R2: {r2:.4f}")
 
 modelos = {
-    "Regresion_Lineal": LinearRegression(),
-
+    "Baseline": modelo_base,
+    "Regresion_Lineal": LinearRegression(
+        
+    ),
     "Random_Forest": RandomForestRegressor(
-        n_estimators=100,
+        n_estimators=200,
         max_depth=6,
         max_features=4,
         random_state=42
     ),
-
     "Gradient_Boosting": GradientBoostingRegressor(
         n_estimators=200,
         max_depth=3,
@@ -584,20 +714,5 @@ modelos = {
     )
 }
 
-configure_experiment(
-    "Regresion_Lineal",
-    modelos,
-    option=1
-)
-
-configure_experiment(
-    "Random_Forest",
-    modelos,
-    option=2
-)
-
-configure_experiment(
-    "Gradient_Boosting",
-    modelos,
-    option=3
-)
+#ejecutar el baseline
+configure_experiment("Proyecto_ICFES", modelos, 0)
