@@ -1,0 +1,16 @@
+# MLflow
+mlflow.db
+mlflow.db-shm
+mlflow.db-wal
+mlartifacts/
+mlruns/
+mlflow.db
+mlflow_backup_*.db
+
+# Python
+__pycache__/
+*.pyc
+
+# Entornos virtuales
+.venv/
+venv/

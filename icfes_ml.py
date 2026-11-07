@@ -3,8 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.base import clone
-
 
 from scipy.stats import (
     pearsonr,
@@ -529,7 +527,7 @@ numericas = X_train_base.select_dtypes(
 ).columns.tolist()
 
 categoricas = X_train_base.select_dtypes(
-    include=["object", "category", "string", "bool"]
+    include=["object", "category", "bool"]
 ).columns.tolist()
 
 from sklearn.compose import ColumnTransformer
@@ -612,7 +610,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 
-#mlflow.set_tracking_uri("http://127.0.0.1:8050")
+# mlflow.set_tracking_uri("http://127.0.0.1:8050")
 
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline
@@ -698,7 +696,10 @@ def configure_experiment(name_experiment, modelos, option):
 modelos = {
     "Baseline": modelo_base,
     "Regresion_Lineal": LinearRegression(
-        
+        fit_intercept = True,
+        copy_X = True,
+        n_jobs = None,
+        positivo = False
     ),
     "Random_Forest": RandomForestRegressor(
         n_estimators=200,
