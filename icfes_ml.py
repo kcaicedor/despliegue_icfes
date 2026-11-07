@@ -699,7 +699,7 @@ modelos = {
         fit_intercept = True,
         copy_X = True,
         n_jobs = None,
-        positivo = False
+        positive = False
     ),
     "Random_Forest": RandomForestRegressor(
         n_estimators=200,
@@ -716,4 +716,4 @@ modelos = {
 }
 
 #ejecutar el baseline
-configure_experiment("Proyecto_ICFES", modelos, 0)
+configure_experiment("Proyecto_ICFES", modelos, 2)
