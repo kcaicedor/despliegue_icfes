@@ -473,11 +473,11 @@ municipios_diferentes = X_train[
     X_train["estu_mcpio_presentacion"]
 ]
 
-print("Registros diferentes:", len(municipios_diferentes))
+#print("Registros diferentes:", len(municipios_diferentes))
 
-colegios_multisede = sedes_por_colegio[sedes_por_colegio > 1]
+#colegios_multisede = sedes_por_colegio[sedes_por_colegio > 1]
 
-print("Establecimientos con varias sedes:", len(colegios_multisede))
+#print("Establecimientos con varias sedes:", len(colegios_multisede))
 
 # Copia del dataset transformado
 X_train_fe2 = X_train_fe.copy()
@@ -610,73 +610,63 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 
+# mlflow.set_tracking_uri("http://127.0.0.1:8050")
 
+from sklearn.base import clone
+from sklearn.pipeline import Pipeline
 
 def configure_experiment(name_experiment, modelos, option):
-
-    # Registrar experimento
     experiment = mlflow.set_experiment(name_experiment)
 
-    # Seleccionar modelo
     if option == 0:
         rf = modelos["Baseline"]
         nombre_modelo = "baseline-model"
-        X_train_model = X_train_base
-        y_train_model = y_train_base
-        X_test_model = X_test_base
-        y_test_model = y_test_base
+        X_train_model, y_train_model = X_train_base, y_train_base
+        X_test_model, y_test_model = X_test_base, y_test_base
 
     elif option == 1:
         rf = modelos["Regresion_Lineal"]
         nombre_modelo = "regresion-lineal-model"
-        X_train_model = X_train
-        y_train_model = y_train
-        X_test_model = X_test
-        y_test_model = y_test
+        X_train_model, y_train_model = X_train, y_train
+        X_test_model, y_test_model = X_test, y_test
 
     elif option == 2:
         rf = modelos["Random_Forest"]
         nombre_modelo = "random-forest-model"
-        X_train_model = X_train
-        y_train_model = y_train
-        X_test_model = X_test
-        y_test_model = y_test
+        X_train_model, y_train_model = X_train, y_train
+        X_test_model, y_test_model = X_test, y_test
 
     elif option == 3:
         rf = modelos["Gradient_Boosting"]
         nombre_modelo = "gradient-boosting-model"
-        X_train_model = X_train
-        y_train_model = y_train
-        X_test_model = X_test
-        y_test_model = y_test
+        X_train_model, y_train_model = X_train, y_train
+        X_test_model, y_test_model = X_test, y_test
 
     else:
-        raise ValueError("Opcion No Válida")
+        raise ValueError("Opción no válida")
+
+    # El baseline ya contiene su propio preprocesamiento.
+    # Los demás modelos necesitan que se lo agreguemos.
+    if option != 0:
+        rf = Pipeline([
+            ("preprocesamiento", clone(preprocessor_base)),
+            ("modelo", rf)
+        ])
 
     with mlflow.start_run(
         experiment_id=experiment.experiment_id,
         run_name=nombre_modelo
     ):
-
         mlflow.set_tag("modelo", nombre_modelo)
 
-        # Registrar parámetros
-        if hasattr(rf, "get_params"):
-            mlflow.log_params(rf.get_params())
-
-        # Entrenar modelo
         rf.fit(X_train_model, y_train_model)
-
-        # Predicciones
         predictions = rf.predict(X_test_model)
 
-        # Calcular métricas
         mse = mean_squared_error(y_test_model, predictions)
         mae = mean_absolute_error(y_test_model, predictions)
         rmse = np.sqrt(mse)
         r2 = r2_score(y_test_model, predictions)
 
-        # Registrar métricas
         mlflow.log_metrics({
             "MSE": mse,
             "MAE": mae,
@@ -684,12 +674,17 @@ def configure_experiment(name_experiment, modelos, option):
             "R2": r2
         })
 
-        # Registrar modelo
-        #mlflow.sklearn.log_model(rf, "modelo")
+        # Registra los parámetros del estimador, no los del preprocesador.
+        if option != 0:
+            params = rf.named_steps["modelo"].get_params()
+            mlflow.log_params({
+                f"modelo_{key}": str(value)
+                for key, value in params.items()
+            })
+
         mlflow.sklearn.log_model(
             sk_model=rf,
-            artifact_path="modelo",
-            serialization_format="pickle"
+            artifact_path="modelo"
         )
 
         print(f"Modelo: {nombre_modelo}")
@@ -701,7 +696,10 @@ def configure_experiment(name_experiment, modelos, option):
 modelos = {
     "Baseline": modelo_base,
     "Regresion_Lineal": LinearRegression(
-        
+        fit_intercept = True,
+        copy_X = True,
+        n_jobs = None,
+        positive = False
     ),
     "Random_Forest": RandomForestRegressor(
         n_estimators=200,
@@ -718,4 +716,4 @@ modelos = {
 }
 
 #ejecutar el baseline
-configure_experiment("Proyecto_ICFES", modelos, 0)
+configure_experiment("Proyecto_ICFES", modelos, 2)
