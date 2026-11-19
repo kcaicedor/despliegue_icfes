@@ -1,0 +1,35 @@
+{
+  "inputs": [
+    {
+      "cole_area_ubicacion": "URBANO",
+      "cole_bilingue": "N",
+      "cole_calendario": "A",
+      "cole_caracter": "ACADÉMICO",
+      "cole_genero": "MIXTO",
+      "cole_jornada": "MAÑANA",
+      "cole_naturaleza": "OFICIAL",
+      "cole_nombre_establecimiento": "COLEGIO DISTRITAL EJEMPLO",
+      "cole_nombre_sede": "SEDE PRINCIPAL",
+      "cole_sede_principal": "S",
+      "estu_depto_presentacion": "BOGOTÁ",
+      "estu_depto_reside": "BOGOTÁ",
+      "estu_estadoinvestigacion": "PUBLICAR",
+      "estu_genero": "F",
+      "estu_mcpio_presentacion": "BOGOTÁ D.C.",
+      "estu_mcpio_reside": "BOGOTÁ D.C.",
+      "estu_nacionalidad": "COLOMBIA",
+      "estu_pais_reside": "COLOMBIA",
+      "estu_privado_libertad": "N",
+      "fami_cuartoshogar": "Tres",
+      "fami_educacionmadre": "Secundaria (Bachillerato) completa",
+      "fami_educacionpadre": "Técnica o tecnológica completa",
+      "fami_estratovivienda": "Estrato 3",
+      "fami_personashogar": "3 a 4",
+      "fami_tieneautomovil": "No",
+      "fami_tienecomputador": "Si",
+      "fami_tieneinternet": "Si",
+      "fami_tienelavadora": "Si",
+      "edad": 17
+    }
+  ]
+}
