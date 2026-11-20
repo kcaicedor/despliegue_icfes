@@ -7,7 +7,11 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from io import BytesIO
 from fastapi.encoders import jsonable_encoder
 from loguru import logger
-from model_icfes import predecir
+from model_icfes import (
+    cargar_modelo,
+    preparar_datos,
+    obtener_explicabilidad_lineal
+)
 
 from app import __version__, schemas
 from app.config import settings
@@ -30,10 +34,15 @@ def health() -> dict:
 
 # Ruta para realizar las predicciones
 @api_router.post("/predict", response_model=schemas.PredictionResults, status_code=200)
+@api_router.post(
+    "/predict",
+    response_model=schemas.PredictionResults,
+    status_code=200
+)
 async def predict(file: UploadFile = File(...)):
 
     try:
-        # 1. Leer el archivo recibido
+        # 1. Leer archivo
         contenido = await file.read()
 
         if not contenido:
@@ -42,7 +51,7 @@ async def predict(file: UploadFile = File(...)):
                 detail="El archivo está vacío."
             )
 
-        # 2. Identificar y leer el formato
+        # 2. Identificar formato
         nombre_archivo = (file.filename or "").lower()
 
         if nombre_archivo.endswith(".csv"):
@@ -57,7 +66,7 @@ async def predict(file: UploadFile = File(...)):
                 detail="Formato no soportado. Utilice CSV o Excel."
             )
 
-        # 3. Validar que existan registros
+        # 3. Validar registros
         if input_df.empty:
             raise HTTPException(
                 status_code=400,
@@ -69,29 +78,63 @@ async def predict(file: UploadFile = File(...)):
             f"Registros: {len(input_df)}"
         )
 
-        # 4. Ejecutar el modelo empaquetado
-        predicciones = predecir(input_df)
+        # 4. Cargar modelo entrenado
+        modelo = cargar_modelo()
 
-        # 5. Convertir las predicciones a una lista
-        if isinstance(predicciones, np.ndarray):
-            predicciones = predicciones.tolist()
-        elif isinstance(predicciones, pd.Series):
-            predicciones = predicciones.tolist()
-        else:
-            predicciones = list(predicciones)
+        # 5. Preparar datos
+        df_modelo = preparar_datos(input_df)
 
-        # 6. Construir respuesta
+        # 6. Generar predicciones
+        predicciones = modelo.predict(df_modelo)
+
+        predicciones = np.asarray(
+            predicciones
+        ).reshape(-1).tolist()
+
+        # 7. Calcular importancia global y contribuciones
+        importancia_global, contribuciones_individuales = (
+            obtener_explicabilidad_lineal(
+                modelo,
+                df_modelo,
+                top_n=5
+            )
+        )
+
+        # 8. Validar cantidad de resultados
+        if len(predicciones) != len(df_modelo):
+            raise ValueError(
+                "La cantidad de predicciones no coincide "
+                "con la cantidad de registros."
+            )
+
+        if len(contribuciones_individuales) != len(df_modelo):
+            raise ValueError(
+                "La cantidad de contribuciones no coincide "
+                "con la cantidad de registros."
+            )
+
+        logger.info(
+            "Predicciones y explicabilidad calculadas correctamente."
+        )
+
+        # 9. Construir respuesta
         return {
             "errors": None,
             "version": model_version,
-            "predictions": [float(valor) for valor in predicciones]
+            "predictions": [
+                float(valor) for valor in predicciones
+            ],
+            "importancia_global": importancia_global,
+            "contribuciones_individuales": contribuciones_individuales
         }
 
     except HTTPException:
         raise
 
     except Exception as e:
-        logger.exception(f"Error realizando predicciones: {str(e)}")
+        logger.exception(
+            f"Error realizando predicciones: {str(e)}"
+        )
 
         raise HTTPException(
             status_code=400,

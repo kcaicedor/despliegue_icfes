@@ -1,9 +1,10 @@
-from typing import Any, List, Optional
-
+from typing import Any
 from pydantic import BaseModel
 
-# Esquema de los resultados de predicción
+
 class PredictionResults(BaseModel):
-    errors: Optional[Any] = None
+    errors: Any = None
     version: str
-    predictions: Optional[List[float]] = None
+    predictions: list[float]
+    importancia_global: list[dict[str, Any]]
+    contribuciones_individuales: list[list[dict[str, Any]]]

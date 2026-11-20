@@ -326,6 +326,7 @@ from functools import lru_cache
 
 import joblib
 import pandas as pd
+import numpy as np
 
 
 FECHA_EXAMEN = pd.Timestamp("2022-09-02")
@@ -428,6 +429,106 @@ def preparar_datos(datos):
 
     return df
 
+def obtener_explicabilidad_lineal(
+    pipeline,
+    df_inputs: pd.DataFrame,
+    top_n: int = 5
+):
+    # Obtener los componentes del pipeline
+    preprocesador = pipeline.named_steps["preprocesamiento"]
+    regresor = pipeline.named_steps["modelo"]
+
+    # Transformar los datos
+    X_trans = preprocesador.transform(df_inputs)
+
+    if hasattr(X_trans, "toarray"):
+        X_trans = X_trans.toarray()
+
+    X_trans = np.asarray(X_trans)
+
+    # Obtener nombres de variables transformadas
+    nombres_trans = preprocesador.get_feature_names_out()
+
+    coefs = np.asarray(regresor.coef_).reshape(-1)
+
+    # Validar dimensiones
+    if X_trans.shape[1] != len(coefs):
+        raise ValueError(
+            "Las dimensiones de los datos transformados "
+            "no coinciden con los coeficientes del modelo."
+        )
+
+    # Mapear variables transformadas a variables originales
+    variables_originales = df_inputs.columns.tolist()
+    mapa_origen = []
+
+    for nombre in nombres_trans:
+
+        limpio = nombre.split("__", 1)[-1]
+
+        coincidencias = [
+            col for col in variables_originales
+            if limpio == col or limpio.startswith(col + "_")
+        ]
+
+        origen = (
+            max(coincidencias, key=len)
+            if coincidencias
+            else limpio
+        )
+
+        mapa_origen.append(origen)
+
+    # ----------------------------------------
+    # 1. IMPORTANCIA GLOBAL
+    # ----------------------------------------
+
+    df_global = pd.DataFrame({
+        "variable": mapa_origen,
+        "peso": np.abs(coefs)
+    })
+
+    top_global = (
+        df_global.groupby("variable")["peso"].max()
+        .sort_values(ascending=False)
+        .head(top_n)
+        .round(2)
+        .reset_index()
+        .to_dict(orient="records")
+    )
+
+    # ----------------------------------------
+    # 2. CONTRIBUCIONES INDIVIDUALES
+    # ----------------------------------------
+
+    contribuciones_matriz = X_trans * coefs
+
+    contribuciones_lista = []
+
+    for fila in contribuciones_matriz:
+
+        df_ind = pd.DataFrame({
+            "variable": mapa_origen,
+            "contribucion": fila
+        })
+
+        agrupado = (
+            df_ind.groupby("variable")["contribucion"].sum()
+        )
+
+        top_ind = agrupado.reindex(
+            agrupado.abs().sort_values(ascending=False).index
+        ).head(top_n)
+
+        contribuciones_lista.append([
+            {
+                "variable": var,
+                "contribucion": round(float(val), 2)
+            }
+            for var, val in top_ind.items()
+        ])
+
+    return top_global, contribuciones_lista
 
 def predecir(datos):
 
@@ -487,7 +588,7 @@ def generar_wheel(modelo):
 
         # Crear __init__.py
         (ruta_paquete / "__init__.py").write_text(
-            "from .predictor import cargar_modelo, predecir, preparar_datos\n",
+            "from .predictor import cargar_modelo, predecir, preparar_datos, obtener_explicabilidad_lineal\n",
             encoding="utf-8"
         )
 
