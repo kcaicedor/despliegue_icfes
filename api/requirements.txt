@@ -1,0 +1,28 @@
+
+# ============================================================
+# API - PROYECTO DESPLIEGUE ICFES
+# ============================================================
+
+# Paquete del modelo predictivo
+./model-pkg/model_icfes-0.0.1-py3-none-any.whl
+
+# API y servidor
+fastapi>=0.118.3,<1.0.0
+uvicorn>=0.30.0,<1.0.0
+python-multipart>=0.0.20,<1.0.0
+
+# Validación y configuración
+pydantic>=2.12,<3.0
+pydantic-settings>=2.10,<3.0
+
+# Procesamiento de datos y modelo
+numpy>=2.0,<3.0
+pandas>=2.2,<4.0
+scikit-learn>=1.7,<2.0
+joblib>=1.4,<2.0
+
+# Lectura de archivos Excel
+openpyxl>=3.1.5,<4.0
+
+# Logging
+loguru>=0.7.3,<1.0.0
